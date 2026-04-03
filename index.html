@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Check | JR Nation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <img id="hype-bg-slider" src="1.png" alt="Chaos Background">
+
+    <div id="setup-container" class="panel">
+        <h1>Check Friend's Status</h1>
+        <p>Advanced AI scan to determine their current vibe.</p>
+        <P>JUST CLICK ANALYZE STATUS TO MAKE DEFAULT</P>
+        <input type="text" id="targetName" placeholder="Enter name..." autocomplete="off">
+        <br>
+        <button onclick="triggerHype()">Analyze Status</button>
+    </div>
+
+    <div id="trap-container" class="panel" style="display: none;">
+        <h1>Incoming Status Check</h1>
+        <p>Someone ran a background check on you. The results are ready.</p>
+        <button class="trap-btn" onclick="springTheTrap()">Click to Reveal</button>
+    </div>
+
+    <div id="meme-container">
+        <div class="hype-text" id="finalText">NAME NIPPU RA!!!</div>
+        <button class="whatsapp-btn" onclick="shareCustomLink()">🔥 Send to Another Victim</button>
+    </div>
+
+    <audio id="hypeAudio" src="audio.mp3" preload="auto"></audio>
+    <div id="ad-zone"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

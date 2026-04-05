@@ -168,27 +168,58 @@ async function downloadChaosVideo() {
             downloadBtn.disabled = false;
         };
 
-        // 5. Start Drawing
+// 5. Start Drawing
         let frameIndex = 0;
         const drawInterval = setInterval(() => {
-            ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
+            const img = preloadedImages[frameIndex];
+
+            // --- FIX 1: The "Object-Fit: Cover" Math ---
+            // Clear the canvas first
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate the scale to fill the canvas without squishing
+            const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+            const drawWidth = img.width * scale;
+            const drawHeight = img.height * scale;
             
-            ctx.font = "150px Anton";
+            // Center the image
+            const x = (canvas.width / 2) - (drawWidth / 2);
+            const y = (canvas.height / 2) - (drawHeight / 2);
+            
+            ctx.drawImage(img, x, y, drawWidth, drawHeight);
+            
+            // --- FIX 2: Auto-Shrinking Text ---
+            let text = `${currentVictimName} NIPPU RA!!!`;
+            let fontSize = 150; // Start huge
+            ctx.font = `${fontSize}px Anton`;
+            
+            // Keep shrinking the font until it fits inside the canvas (with 100px padding)
+            while (ctx.measureText(text).width > (canvas.width - 100) && fontSize > 40) {
+                fontSize -= 5;
+                ctx.font = `${fontSize}px Anton`;
+            }
+
+            // Draw the Text
             ctx.fillStyle = "#ffcc00";
             ctx.textAlign = "center";
+            ctx.textBaseline = "middle"; // Prevents vertical shifting
+            
+            // Shadow
             ctx.shadowColor = "red";
             ctx.shadowBlur = 30;
             ctx.shadowOffsetX = 6;
             ctx.shadowOffsetY = 6;
             
-            ctx.fillText(`${currentVictimName} NIPPU RA!!!`, canvas.width / 2, canvas.height / 2);
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             
+            // Stroke
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
-            ctx.lineWidth = 5;
+            ctx.lineWidth = Math.max(3, fontSize / 25); // Scale stroke with font size
             ctx.strokeStyle = "#8b0000";
-            ctx.strokeText(`${currentVictimName} NIPPU RA!!!`, canvas.width / 2, canvas.height / 2);
+            ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
 
             frameIndex = (frameIndex + 1) % preloadedImages.length;
         }, 120);

@@ -25,7 +25,7 @@ let slideInterval;
 
 // --- AUDIO REPEAT VARIABLES ---
 let currentPlayCount = 0;
-const MAX_PLAYS = 3;
+const MAX_PLAYS = 1;
 
 window.onload = function() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -47,7 +47,7 @@ window.onload = function() {
             audio.play(); // Play it again
         } else {
             // Once it hits 3 plays, stop the chaos to give it a dramatic ending
-            document.body.classList.remove('shake-chaos', 'slideshow-active');
+            document.body.classList.remove('shake-chaos');
             clearInterval(slideInterval);
         }
     });

@@ -2,6 +2,11 @@
 const BASE_URL = "https://nippu.jrnation.cc"; 
 let currentVictimName = "";
 
+// --- AUDIO HIJACK VARIABLES ---
+let audioCtx;
+let sourceNode;
+let destNode;
+
 // Array of your 9 uploaded images
 const hypeImages = [
     "1.png", "2.png", "3.png", "4.png", "5.png", 
@@ -125,27 +130,33 @@ async function downloadChaosVideo() {
         const ctx = canvas.getContext('2d');
         const canvasStream = canvas.captureStream(30);
 
-        // 3. Safer Audio Capture
+        // 3. 🚨 BULLETPROOF AUDIO HIJACK 🚨
         const audioElement = document.getElementById('hypeAudio');
-        let audioStream;
         
-        if (audioElement.captureStream) {
-            audioStream = audioElement.captureStream();
-        } else if (audioElement.mozCaptureStream) {
-            audioStream = audioElement.mozCaptureStream();
+        // We only create the audio context ONCE to avoid "InvalidStateError" crashes
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            sourceNode = audioCtx.createMediaElementSource(audioElement);
+            destNode = audioCtx.createMediaStreamDestination();
+            
+            // Route audio to the video recorder
+            sourceNode.connect(destNode);
+            // Route audio to the computer speakers
+            sourceNode.connect(audioCtx.destination);
         }
 
-        // Combine video and audio tracks
-        const tracks = [...canvasStream.getVideoTracks()];
-        if (audioStream && audioStream.getAudioTracks().length > 0) {
-            tracks.push(...audioStream.getAudioTracks());
-        } else {
-            console.warn("Audio capture not supported in this browser. Video will be silent.");
+        // Browsers sometimes put the audio engine to sleep; this wakes it up
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
         }
 
-        const combinedStream = new MediaStream(tracks);
+        // Combine video and audio tracks flawlessly
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...destNode.stream.getAudioTracks()
+        ]);
 
-        // 4. Force WebM 
+        // 4. Setup Recorder 
         const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
         const chunks = [];
 
@@ -171,54 +182,46 @@ async function downloadChaosVideo() {
         const drawInterval = setInterval(() => {
             const img = preloadedImages[frameIndex];
 
-            // 🚨 CRITICAL FIX 1: Prevent "Divide by Zero" crash if internet is slow
+            // Prevent crash if image isn't loaded yet
             if (!img || img.width === 0 || img.height === 0) {
                 frameIndex = (frameIndex + 1) % preloadedImages.length;
-                return; // Skip this frame until the image fully loads
+                return; 
             }
 
-            // Clear the canvas first
+            // Clear the canvas
             ctx.fillStyle = "#000000";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Calculate the scale to fill the canvas without squishing
+            // "Object-Fit: Cover" Math
             const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
             const drawWidth = img.width * scale;
             const drawHeight = img.height * scale;
-            
-            // Center the image
             const x = (canvas.width / 2) - (drawWidth / 2);
             const y = (canvas.height / 2) - (drawHeight / 2);
-            
             ctx.drawImage(img, x, y, drawWidth, drawHeight);
             
+            // Text Math
             let text = `${currentVictimName} NIPPU RA!!!`;
             let fontSize = 150; 
-            
-            // 🚨 CRITICAL FIX 2: Explicitly quote the font and add a sans-serif fallback
-            // Without this, Canvas ignores 'Anton' and measures the wrong font size!
             ctx.font = `${fontSize}px 'Anton', sans-serif`;
             
-            // Keep shrinking the font until it fits inside the canvas
+            // Auto-shrink text
             while (ctx.measureText(text).width > (canvas.width - 100) && fontSize > 40) {
                 fontSize -= 5;
-                ctx.font = `${fontSize}px 'Anton', sans-serif`; // Must update this inside the loop too!
+                ctx.font = `${fontSize}px 'Anton', sans-serif`;
             }
 
-            // Draw the Text
+            // Draw Text
             ctx.fillStyle = "#ffcc00";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle"; 
-            
-            // Shadow
             ctx.shadowColor = "red";
             ctx.shadowBlur = 30;
             ctx.shadowOffsetX = 6;
             ctx.shadowOffsetY = 6;
-            
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             
-            // Stroke
+            // Draw Stroke
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
@@ -229,7 +232,7 @@ async function downloadChaosVideo() {
             frameIndex = (frameIndex + 1) % preloadedImages.length;
         }, 120);
 
-        // 6. Start Recording
+        // 6. Start Playing Audio & Recording
         audioElement.currentTime = 0;
         audioElement.play();
         recorder.start();

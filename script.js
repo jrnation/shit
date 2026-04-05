@@ -129,7 +129,6 @@ async function downloadChaosVideo() {
         const audioElement = document.getElementById('hypeAudio');
         let audioStream;
         
-        // This method is much less prone to crashing than Web Audio API
         if (audioElement.captureStream) {
             audioStream = audioElement.captureStream();
         } else if (audioElement.mozCaptureStream) {
@@ -146,7 +145,7 @@ async function downloadChaosVideo() {
 
         const combinedStream = new MediaStream(tracks);
 
-        // 4. Force WebM (MP4 causes silent failures in Chrome)
+        // 4. Force WebM 
         const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
         const chunks = [];
 
@@ -161,19 +160,23 @@ async function downloadChaosVideo() {
             document.body.appendChild(a);
             a.click();
             
-            // Clean up
             URL.revokeObjectURL(url);
             document.body.removeChild(a);
             downloadBtn.innerText = originalText;
             downloadBtn.disabled = false;
         };
 
-// 5. Start Drawing
+        // 5. Start Drawing
         let frameIndex = 0;
         const drawInterval = setInterval(() => {
             const img = preloadedImages[frameIndex];
 
-            // --- FIX 1: The "Object-Fit: Cover" Math ---
+            // 🚨 CRITICAL FIX 1: Prevent "Divide by Zero" crash if internet is slow
+            if (!img || img.width === 0 || img.height === 0) {
+                frameIndex = (frameIndex + 1) % preloadedImages.length;
+                return; // Skip this frame until the image fully loads
+            }
+
             // Clear the canvas first
             ctx.fillStyle = "#000000";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -189,21 +192,23 @@ async function downloadChaosVideo() {
             
             ctx.drawImage(img, x, y, drawWidth, drawHeight);
             
-            // --- FIX 2: Auto-Shrinking Text ---
             let text = `${currentVictimName} NIPPU RA!!!`;
-            let fontSize = 150; // Start huge
-            ctx.font = `${fontSize}px Anton`;
+            let fontSize = 150; 
             
-            // Keep shrinking the font until it fits inside the canvas (with 100px padding)
+            // 🚨 CRITICAL FIX 2: Explicitly quote the font and add a sans-serif fallback
+            // Without this, Canvas ignores 'Anton' and measures the wrong font size!
+            ctx.font = `${fontSize}px 'Anton', sans-serif`;
+            
+            // Keep shrinking the font until it fits inside the canvas
             while (ctx.measureText(text).width > (canvas.width - 100) && fontSize > 40) {
                 fontSize -= 5;
-                ctx.font = `${fontSize}px Anton`;
+                ctx.font = `${fontSize}px 'Anton', sans-serif`; // Must update this inside the loop too!
             }
 
             // Draw the Text
             ctx.fillStyle = "#ffcc00";
             ctx.textAlign = "center";
-            ctx.textBaseline = "middle"; // Prevents vertical shifting
+            ctx.textBaseline = "middle"; 
             
             // Shadow
             ctx.shadowColor = "red";
@@ -217,7 +222,7 @@ async function downloadChaosVideo() {
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
-            ctx.lineWidth = Math.max(3, fontSize / 25); // Scale stroke with font size
+            ctx.lineWidth = Math.max(3, fontSize / 25); 
             ctx.strokeStyle = "#8b0000";
             ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
 
@@ -236,7 +241,6 @@ async function downloadChaosVideo() {
         }, 12000);
 
     } catch (error) {
-        // If it breaks, this will tell us exactly WHY!
         console.error("CRITICAL ERROR RECORDING VIDEO:", error);
         alert("Recording failed! Check the developer console (F12) for the exact error.");
         

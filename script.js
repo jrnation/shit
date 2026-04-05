@@ -107,116 +107,109 @@ function shareCustomLink() {
 
 
 
+
+
+
 async function downloadChaosVideo() {
-    // 1. Change the button text so they know it's working
-    const downloadBtn = document.getElementById('downloadBtn');
-    const originalText = downloadBtn.innerText;
-    downloadBtn.innerText = "⏳ Compiling Chaos... Please Wait 12s";
-    downloadBtn.disabled = true;
+    try {
+        // 1. UI Update
+        const downloadBtn = document.getElementById('downloadBtn');
+        const originalText = downloadBtn.innerText;
+        downloadBtn.innerText = "⏳ Compiling Chaos... Wait 12s";
+        downloadBtn.disabled = true;
 
-    // 2. Set up the hidden digital whiteboard (Canvas)
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080; // High-res vertical video
-    canvas.height = 1920;
-    const ctx = canvas.getContext('2d');
+        // 2. Setup Canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 1080;
+        canvas.height = 1920;
+        const ctx = canvas.getContext('2d');
+        const canvasStream = canvas.captureStream(30);
 
-    // 3. Setup the Audio Hijack (Web Audio API)
-    const audioElement = document.getElementById('hypeAudio');
-    // Create an audio context
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // We grab the sound coming from the audio element
-    const sourceNode = audioCtx.createMediaElementSource(audioElement);
-    const destinationNode = audioCtx.createMediaStreamDestination();
-    
-    // Route the audio to the recorder AND to the user's speakers so they still hear it
-    sourceNode.connect(destinationNode); 
-    sourceNode.connect(audioCtx.destination); 
+        // 3. Safer Audio Capture
+        const audioElement = document.getElementById('hypeAudio');
+        let audioStream;
+        
+        // This method is much less prone to crashing than Web Audio API
+        if (audioElement.captureStream) {
+            audioStream = audioElement.captureStream();
+        } else if (audioElement.mozCaptureStream) {
+            audioStream = audioElement.mozCaptureStream();
+        }
 
-    // 4. Capture the visual stream from the canvas
-    const canvasStream = canvas.captureStream(30); // 30 FPS
+        // Combine video and audio tracks
+        const tracks = [...canvasStream.getVideoTracks()];
+        if (audioStream && audioStream.getAudioTracks().length > 0) {
+            tracks.push(...audioStream.getAudioTracks());
+        } else {
+            console.warn("Audio capture not supported in this browser. Video will be silent.");
+        }
 
-    // 5. Combine Audio and Visuals into one master stream!
-    const combinedStream = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...destinationNode.stream.getAudioTracks()
-    ]);
+        const combinedStream = new MediaStream(tracks);
 
-    // 6. Try to force MP4, fallback to WebM if Chrome blocks it
-    let mimeType = 'video/webm; codecs=vp9,opus';
-    let fileExtension = '.webm';
-    
-    if (MediaRecorder.isTypeSupported('video/mp4')) {
-        mimeType = 'video/mp4';
-        fileExtension = '.mp4';
+        // 4. Force WebM (MP4 causes silent failures in Chrome)
+        const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+        const chunks = [];
+
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+        recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentVictimName}_STATUS.webm`;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            downloadBtn.innerText = originalText;
+            downloadBtn.disabled = false;
+        };
+
+        // 5. Start Drawing
+        let frameIndex = 0;
+        const drawInterval = setInterval(() => {
+            ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
+            
+            ctx.font = "150px Anton";
+            ctx.fillStyle = "#ffcc00";
+            ctx.textAlign = "center";
+            ctx.shadowColor = "red";
+            ctx.shadowBlur = 30;
+            ctx.shadowOffsetX = 6;
+            ctx.shadowOffsetY = 6;
+            
+            ctx.fillText(`${currentVictimName} NIPPU RA!!!`, canvas.width / 2, canvas.height / 2);
+            
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = "#8b0000";
+            ctx.strokeText(`${currentVictimName} NIPPU RA!!!`, canvas.width / 2, canvas.height / 2);
+
+            frameIndex = (frameIndex + 1) % preloadedImages.length;
+        }, 120);
+
+        // 6. Start Recording
+        audioElement.currentTime = 0;
+        audioElement.play();
+        recorder.start();
+
+        // 7. Stop exactly at 12 seconds
+        setTimeout(() => {
+            clearInterval(drawInterval);
+            recorder.stop();
+        }, 12000);
+
+    } catch (error) {
+        // If it breaks, this will tell us exactly WHY!
+        console.error("CRITICAL ERROR RECORDING VIDEO:", error);
+        alert("Recording failed! Check the developer console (F12) for the exact error.");
+        
+        document.getElementById('downloadBtn').innerText = "💾 Download Status Video";
+        document.getElementById('downloadBtn').disabled = false;
     }
-    
-    const recorder = new MediaRecorder(combinedStream, { mimeType: mimeType });
-    const chunks = [];
-
-    recorder.ondataavailable = e => {
-        if (e.data.size > 0) chunks.push(e.data);
-    };
-
-    // 7. When the recording finishes, trigger the download
-    recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${currentVictimName}_STATUS${fileExtension}`;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        // Reset button
-        downloadBtn.innerText = originalText;
-        downloadBtn.disabled = false;
-    };
-
-    // 8. Start drawing the slideshow rapidly to the canvas
-    let frameIndex = 0;
-    const drawInterval = setInterval(() => {
-        // Draw the background image
-        ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
-        
-        // Draw the massive text over it
-        ctx.font = "150px Anton";
-        ctx.fillStyle = "#ffcc00";
-        ctx.textAlign = "center";
-        
-        // Recreate the text shadow from your CSS
-        ctx.shadowColor = "red";
-        ctx.shadowBlur = 30;
-        ctx.shadowOffsetX = 6;
-        ctx.shadowOffsetY = 6;
-        
-        ctx.fillText(`${currentVictimName} NIPPU RA!!!`, canvas.width / 2, canvas.height / 2);
-        
-        // Reset shadow for the stroke
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = "#8b0000";
-        ctx.strokeText(`${currentVictimName} NIPPU RA!!!`, canvas.width / 2, canvas.height / 2);
-
-        frameIndex = (frameIndex + 1) % preloadedImages.length;
-    }, 120);
-
-    // 9. Play the audio from the start and START RECORDING
-    audioElement.currentTime = 0;
-    audioElement.play();
-    recorder.start();
-
-    // 10. STOP EVERYTHING AT EXACTLY 12 SECONDS
-    setTimeout(() => {
-        clearInterval(drawInterval);
-        recorder.stop();
-        // Optional: stop the audio too, or let it finish naturally
-        // audioElement.pause(); 
-    }, 12000); 
 }
